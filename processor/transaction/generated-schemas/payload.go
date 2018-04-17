@@ -1,14 +1,10 @@
-package error
+package schemas
 
-func Schema() string {
-	return errorSchema
-}
-
-var errorSchema = `{
+const PayloadSchema = `{
     "$schema": "http://json-schema.org/draft-04/schema#",
-    "$id": "docs/spec/errors/payload.json",
-    "title": "Errors payload",
-    "description": "List of errors wrapped in an object containing some other attributes normalized away from the errors themselves",
+    "$id": "docs/spec/transactions/payload.json",
+    "title": "Transactions payload",
+    "description": "List of transactions wrapped in an object containing some other attributes normalized away from the transactions themselves",
     "type": "object",
     "properties": {
         "service": {
@@ -127,11 +123,34 @@ var errorSchema = `{
   },
   "required": ["pid"]
         },
-        "errors": {
+        "system": {
+                "$schema": "http://json-schema.org/draft-04/schema#",
+    "$id": "doc/spec/system.json",
+    "title": "System",
+    "type": ["object", "null"],
+    "properties": {
+        "architecture": {
+            "description": "Architecture of the system the agent is running on.",
+            "type": ["string", "null"],
+            "maxLength": 1024
+        },
+        "hostname": {
+            "description": "Hostname of the system the agent is running on.",
+            "type": ["string", "null"],
+            "maxLength": 1024
+        },
+        "platform": {
+            "description": "Name of the system platform the agent is running on.",
+            "type": ["string", "null"],
+            "maxLength": 1024
+        }
+    }
+        },
+        "transactions": {
             "type": "array",
             "items": {
                     "$schema": "http://json-schema.org/draft-04/schema#",
-    "$id": "docs/spec/errors/error.json",
+    "$id": "docs/spec/transactions/transaction.json",
     "type": "object",
     "description": "Data captured by an agent representing an event occurring in a monitored service",
     "properties": {
@@ -321,263 +340,219 @@ var errorSchema = `{
         }
     }
         },
-        "culprit": {
-            "description": "Function call which was the primary perpetrator of this event.",
-            "type": ["string", "null"]
-        },
-        "exception": {
-            "description": "Information about the originally thrown error.",
-            "type": ["object", "null"],
-            "properties": {
-                "code": {
-                    "type": ["string", "integer", "null"],
-                    "maxLength": 1024,
-                    "description": "The error code set when the error happened, e.g. database error code."
-                },
-                "message": {
-                   "description": "The original error message.",
-                   "type": "string"
-                },
-                "module": {
-                    "description": "Describes the exception type's module namespace.",
-                    "type": ["string", "null"],
-                    "maxLength": 1024
-                },
-                "attributes": {
-                    "type": ["object", "null"]
-                },
-                "stacktrace": {
-                    "type": ["array", "null"],
-                    "items": {
-                            "$schema": "http://json-schema.org/draft-04/schema#",
-    "$id": "docs/spec/stacktrace_frame.json",
-    "title": "Stacktrace",
-    "type": "object",
-    "description": "A stacktrace frame, contains various bits (most optional) describing the context of the frame",
-    "properties": {
-        "abs_path": {
-            "description": "The absolute path of the file involved in the stack frame",
-            "type": ["string", "null"]
-        },
-        "colno": {
-            "description": "Column number",
-            "type": ["integer", "null"]
-        },
-        "context_line": {
-            "description": "The line of code part of the stack frame",
-            "type": ["string", "null"]
-        },
-        "filename": {
-            "description": "The relative filename of the code involved in the stack frame, used e.g. to do error checksumming",
-            "type": "string"
-        },
-        "function": {
-            "description": "The function involved in the stack frame",
-            "type": ["string", "null"]
-        },
-        "library_frame": {
-            "description": "A boolean, indicating if this frame is from a library or user code",
-            "type": ["boolean", "null"]
-        },
-        "lineno": {
-            "description": "The line number of code part of the stack frame, used e.g. to do error checksumming",
-            "type": "integer"
-        },
-        "module": {
-            "description": "The module to which frame belongs to",
-            "type": ["string", "null"]
-        },
-        "post_context": {
-            "description": "The lines of code after the stack frame",
-            "type": ["array", "null"],
-            "minItems": 0,
-            "items": {
-                "type": "string"
-            }
-        },
-        "pre_context": {
-            "description": "The lines of code before the stack frame",
-            "type": ["array", "null"],
-            "minItems": 0,
-            "items": {
-                "type": "string"
-            }
-        },
-        "vars": {
-            "description": "Local variables for this stack frame",
-            "type": ["object", "null"],
-            "properties": {}
-        }
-    },
-    "required": ["filename", "lineno"]
-                    },
-                    "minItems": 0
-                },
-                "type": {
-                    "type": ["string", "null"],
-                    "maxLength": 1024
-                },
-                "handled": {
-                    "type": ["boolean", "null"],
-                    "description": "Indicator whether the error was caught somewhere in the code or not."
-                }
-            },
-            "required": ["message"]
+        "duration": {
+            "type": "number",
+            "description": "How long the transaction took to complete, in ms with 3 decimal points"
         },
         "id": {
-            "type": ["string", "null"],
-            "description": "UUID for the error",
+            "type": "string",
+            "description": "UUID for the transaction, referred by its spans",
             "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
         },
-        "log": {
-            "type": ["object", "null"],
-            "description": "Additional information added when logging the error.",
-            "properties": {
-                "level": {
-                    "description": "The severity of the record.",
-                    "type": ["string", "null"],
-                    "maxLength": 1024
-                },
-                "logger_name": {
-                    "description": "The name of the logger instance used.",
-                    "type": ["string", "null"],
-                    "default": "default",
-                    "maxLength": 1024
-                },
-                "message": {
-                    "description": "The additionally logged error message.",
-                    "type": "string"
-                },
-                "param_message": {
-                    "description": "A parametrized message. E.g. 'Could not connect to %s'. The property message is still required, and should be equal to the param_message, but with placeholders replaced. In some situations the param_message is used to group errors together. The string is not interpreted, so feel free to use whichever placeholders makes sense in the client languange.",
-                    "type": ["string", "null"],
-                    "maxLength": 1024
-
-                },
-                "stacktrace": {
-                    "type": ["array", "null"],
-                    "items": {
-                            "$schema": "http://json-schema.org/draft-04/schema#",
-    "$id": "docs/spec/stacktrace_frame.json",
-    "title": "Stacktrace",
-    "type": "object",
-    "description": "A stacktrace frame, contains various bits (most optional) describing the context of the frame",
-    "properties": {
-        "abs_path": {
-            "description": "The absolute path of the file involved in the stack frame",
-            "type": ["string", "null"]
+        "name": {
+            "type": ["string","null"],
+            "description": "Generic designation of a transaction in the scope of a single service (eg: 'GET /users/:id')",
+            "maxLength": 1024
         },
-        "colno": {
-            "description": "Column number",
-            "type": ["integer", "null"]
-        },
-        "context_line": {
-            "description": "The line of code part of the stack frame",
-            "type": ["string", "null"]
-        },
-        "filename": {
-            "description": "The relative filename of the code involved in the stack frame, used e.g. to do error checksumming",
-            "type": "string"
-        },
-        "function": {
-            "description": "The function involved in the stack frame",
-            "type": ["string", "null"]
-        },
-        "library_frame": {
-            "description": "A boolean, indicating if this frame is from a library or user code",
-            "type": ["boolean", "null"]
-        },
-        "lineno": {
-            "description": "The line number of code part of the stack frame, used e.g. to do error checksumming",
-            "type": "integer"
-        },
-        "module": {
-            "description": "The module to which frame belongs to",
-            "type": ["string", "null"]
-        },
-        "post_context": {
-            "description": "The lines of code after the stack frame",
-            "type": ["array", "null"],
-            "minItems": 0,
-            "items": {
-                "type": "string"
-            }
-        },
-        "pre_context": {
-            "description": "The lines of code before the stack frame",
-            "type": ["array", "null"],
-            "minItems": 0,
-            "items": {
-                "type": "string"
-            }
-        },
-        "vars": {
-            "description": "Local variables for this stack frame",
-            "type": ["object", "null"],
-            "properties": {}
-        }
-    },
-    "required": ["filename", "lineno"]
-                    },
-                    "minItems": 0
-                }
-            },
-            "required": ["message"]
+        "result": {
+          	"type": "string",
+          	"description": "The result of the transaction. HTTP status code for HTTP-related transactions.",
+            "maxLength": 1024
         },
         "timestamp": {
             "type": "string",
-            "format": "date-time",
             "pattern": "Z$",
-            "description": "Recorded time of the error, UTC based and formatted as YYYY-MM-DDTHH:mm:ss.sssZ"
+            "format": "date-time",
+            "description": "Recorded time of the transaction, UTC based and formatted as YYYY-MM-DDTHH:mm:ss.sssZ"
         },
-        "transaction": {
+        "spans": {
+            "type": ["array", "null"],
+            "items": {
+                    "$schema": "http://json-schema.org/draft-04/schema#",
+    "$id": "docs/spec/transactions/span.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": ["integer", "null"],
+            "description": "The locally unique ID of the span."
+        },
+        "context": {
             "type": ["object", "null"],
-            "description": "Data for correlating errors with transactions",
+            "description": "Any other arbitrary data captured by the agent, optionally provided by the user",
             "properties": {
-                "id": {
-                    "type": "string",
-                    "description": "UUID for the transaction",
-                    "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$",
+                "db": {
+                    "type": ["object", "null"],
+                    "description": "An object containing contextual data for database spans",
+                    "properties": {
+                        "instance": {
+                           "type": ["string", "null"],
+                           "description": "Database instance name"
+                        },
+                        "statement": {
+                           "type": ["string", "null"],
+                           "description": "A database statement (e.g. query) for the given database type"
+                        },
+                        "type": {
+                           "type": ["string", "null"],
+                           "description": "Database type. For any SQL database, \"sql\". For others, the lower-case database category, e.g. \"cassandra\", \"hbase\", or \"redis\""
+                        },
+                        "user": {
+                           "type": ["string", "null"],
+                           "description": "Username for accessing database"
+                        }
+                    }
+                }
+            }
+        },
+        "duration": {
+            "type": "number",
+            "description": "Duration of the span in milliseconds"
+        },
+        "name": {
+            "type": "string",
+            "description": "Generic designation of a span in the scope of a transaction",
+            "maxLength": 1024
+        },
+        "parent": {
+            "type": ["integer", "null"],
+            "description": "The locally unique ID of the parent of the span."
+        },
+        "stacktrace": {
+            "type": ["array", "null"],
+            "description": "List of stack frames with variable attributes (eg: lineno, filename, etc)",
+            "items": {
+                    "$schema": "http://json-schema.org/draft-04/schema#",
+    "$id": "docs/spec/stacktrace_frame.json",
+    "title": "Stacktrace",
+    "type": "object",
+    "description": "A stacktrace frame, contains various bits (most optional) describing the context of the frame",
+    "properties": {
+        "abs_path": {
+            "description": "The absolute path of the file involved in the stack frame",
+            "type": ["string", "null"]
+        },
+        "colno": {
+            "description": "Column number",
+            "type": ["integer", "null"]
+        },
+        "context_line": {
+            "description": "The line of code part of the stack frame",
+            "type": ["string", "null"]
+        },
+        "filename": {
+            "description": "The relative filename of the code involved in the stack frame, used e.g. to do error checksumming",
+            "type": "string"
+        },
+        "function": {
+            "description": "The function involved in the stack frame",
+            "type": ["string", "null"]
+        },
+        "library_frame": {
+            "description": "A boolean, indicating if this frame is from a library or user code",
+            "type": ["boolean", "null"]
+        },
+        "lineno": {
+            "description": "The line number of code part of the stack frame, used e.g. to do error checksumming",
+            "type": "integer"
+        },
+        "module": {
+            "description": "The module to which frame belongs to",
+            "type": ["string", "null"]
+        },
+        "post_context": {
+            "description": "The lines of code after the stack frame",
+            "type": ["array", "null"],
+            "minItems": 0,
+            "items": {
+                "type": "string"
+            }
+        },
+        "pre_context": {
+            "description": "The lines of code before the stack frame",
+            "type": ["array", "null"],
+            "minItems": 0,
+            "items": {
+                "type": "string"
+            }
+        },
+        "vars": {
+            "description": "Local variables for this stack frame",
+            "type": ["object", "null"],
+            "properties": {}
+        }
+    },
+    "required": ["filename", "lineno"]
+            },
+            "minItems": 0
+        },
+        "start": {
+            "type": "number",
+            "description": "Offset relative to the transaction's timestamp identifying the start of the span, in milliseconds"
+        },
+        "type": {
+            "type": "string",
+            "description": "Keyword of specific relevance in the service's domain (eg: 'db.postgresql.query', 'template.erb', etc)",
+            "maxLength": 1024
+        }
+    },
+    "dependencies": {
+        "parent": {
+            "required": ["id"]
+        }
+    },
+    "required": ["duration", "name", "start", "type"]
+            },
+            "minItems": 0
+        },
+        "type": {
+            "type": "string",
+            "description": "Keyword of specific relevance in the service's domain (eg: 'request', 'backgroundjob', etc)",
+            "maxLength": 1024
+        },
+        "marks": {
+            "type": ["object", "null"],
+            "description": "A mark captures the timing of a significant event during the lifetime of a transaction. Marks are organized into groups and can be set by the user or the agent.",
+            "regexProperties": true,
+            "patternProperties": {
+                "^[^.*\"]*$": {
+                        "$schema": "http://json-schema.org/draft-04/schema#",
+    "$id": "docs/spec/transactions/mark.json",
+    "type": ["object", "null"],
+    "description": "A mark captures the timing in milliseconds of a significant event during the lifetime of a transaction. Every mark is a simple key value pair, where the value has to be a number, and can be set by the user or the agent.",
+    "regexProperties": true,
+    "patternProperties": {
+        "^[^.*\"]*$": { "type": "number" }
+    },
+    "additionalProperties": false,
                     "maxLength": 1024
+                }
+            },
+            "additionalProperties": false
+        },
+        "sampled": {
+            "type": ["boolean", "null"],
+            "description": "Transactions that are 'sampled' will include all available information. Transactions that are not sampled will not have 'spans' or 'context'. Defaults to true."
+        },
+        "span_count": {
+            "type": ["object", "null"],
+            "properties": {
+                "dropped": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "total": {
+                            "type": ["integer","null"],
+                            "description": "Number of spans that have been dropped by the agent recording the transaction."
+                        }
+                    }
                 }
             }
         }
     },
-    "anyOf": [
-        {
-            "required": ["exception"]
-        },
-        {
-            "required": ["log"]
-        }
-    ]
+    "required": ["id", "duration", "type"]
             },
             "minItems": 1
-        },
-        "system": {
-                "$schema": "http://json-schema.org/draft-04/schema#",
-    "$id": "doc/spec/system.json",
-    "title": "System",
-    "type": ["object", "null"],
-    "properties": {
-        "architecture": {
-            "description": "Architecture of the system the agent is running on.",
-            "type": ["string", "null"],
-            "maxLength": 1024
-        },
-        "hostname": {
-            "description": "Hostname of the system the agent is running on.",
-            "type": ["string", "null"],
-            "maxLength": 1024
-        },
-        "platform": {
-            "description": "Name of the system platform the agent is running on.",
-            "type": ["string", "null"],
-            "maxLength": 1024
-        }
-    }
         }
     },
-    "required": ["service", "errors"]
+    "required": ["service", "transactions"]
 }
 `

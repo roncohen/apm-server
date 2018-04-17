@@ -1,9 +1,11 @@
 package transaction
 
 import (
+	"github.com/elastic/apm-server/model"
 	pr "github.com/elastic/apm-server/processor"
 	"github.com/elastic/beats/libbeat/monitoring"
 
+	sc "github.com/elastic/apm-server/processor/transaction/generated-schemas"
 	"github.com/santhosh-tekuri/jsonschema"
 )
 
@@ -22,7 +24,7 @@ const (
 	spanDocType        = "span"
 )
 
-var schema = pr.CreateSchema(transactionSchema, processorName)
+var schema = pr.CreateSchema(sc.PayloadSchema, processorName)
 
 func NewProcessor() pr.Processor {
 	return &processor{schema: schema}
@@ -45,13 +47,24 @@ func (p *processor) Validate(raw map[string]interface{}) error {
 	return err
 }
 
-func (p *processor) Decode(raw map[string]interface{}) (pr.Payload, error) {
+func (p *processor) Decode(raw map[string]interface{}) (model.TransformableBatch, error) {
 	decodingCount.Inc()
-	pa, err := DecodePayload(raw)
+	txs, err := DecodePayload(raw)
 	if err != nil {
 		decodingError.Inc()
 		return nil, err
 	}
+
 	agent.Set(pa.Service.Agent.Name)
-	return pa, nil
+
+	transformables := []model.Transformable{}
+
+	for _, tx := range txs {
+		transformables = append(transformables, tx)
+		for _, sp := range tx.Spans {
+			transformables = append(transformables, sp)
+		}
+	}
+
+	return transformables, nil
 }

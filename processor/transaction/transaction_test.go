@@ -9,6 +9,8 @@ import (
 
 	"time"
 
+	"github.com/elastic/apm-server/config"
+	m "github.com/elastic/apm-server/model"
 	"github.com/elastic/beats/libbeat/common"
 )
 
@@ -30,7 +32,7 @@ func TestTransactionEventDecode(t *testing.T) {
 	for _, test := range []struct {
 		input       interface{}
 		err, inpErr error
-		e           *Event
+		e           *Transaction
 	}{
 		{input: nil, err: nil, e: nil},
 		{input: nil, inpErr: errors.New("a"), err: errors.New("a"), e: nil},
@@ -38,7 +40,7 @@ func TestTransactionEventDecode(t *testing.T) {
 		{
 			input: map[string]interface{}{"timestamp": 123},
 			err:   errors.New("Error fetching field"),
-			e: &Event{
+			e: &Transaction{
 				Id: "", Type: "", Name: nil, Result: nil,
 				Duration: 0.0, Timestamp: time.Time{},
 				Context: nil, Marks: nil, Sampled: nil,
@@ -59,7 +61,7 @@ func TestTransactionEventDecode(t *testing.T) {
 				},
 			},
 			err: nil,
-			e: &Event{
+			e: &Transaction{
 				Id: id, Type: trType, Name: &name, Result: &result,
 				Duration: duration, Timestamp: timestampParsed,
 				Context: context, Marks: marks, Sampled: &sampled,
@@ -70,7 +72,7 @@ func TestTransactionEventDecode(t *testing.T) {
 			},
 		},
 	} {
-		event, err := DecodeEvent(test.input, test.inpErr)
+		event, err := DecodeTransaction(test.input, test.inpErr)
 		assert.Equal(t, test.e, event)
 		assert.Equal(t, test.err, err)
 	}
@@ -85,12 +87,12 @@ func TestEventTransform(t *testing.T) {
 	name := "mytransaction"
 
 	tests := []struct {
-		Event  Event
+		Event  Transaction
 		Output common.MapStr
 		Msg    string
 	}{
 		{
-			Event: Event{},
+			Event: Transaction{},
 			Output: common.MapStr{
 				"id":       "",
 				"type":     "",
@@ -100,7 +102,7 @@ func TestEventTransform(t *testing.T) {
 			Msg: "Empty Event",
 		},
 		{
-			Event: Event{
+			Event: Transaction{
 				Id:        id,
 				Name:      &name,
 				Type:      "tx",
@@ -126,7 +128,7 @@ func TestEventTransform(t *testing.T) {
 	}
 
 	for idx, test := range tests {
-		output := test.Event.Transform()
+		output := test.Event.Transform(config.TransformConfig{}, &m.TransformContext{})
 		assert.Equal(t, test.Output, output, fmt.Sprintf("Failed at idx %v; %s", idx, test.Msg))
 	}
 }

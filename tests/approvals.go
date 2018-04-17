@@ -13,8 +13,10 @@ import (
 	"github.com/yudai/gojsondiff"
 
 	"github.com/elastic/apm-server/config"
+	"github.com/elastic/apm-server/model"
 	"github.com/elastic/apm-server/processor"
 	"github.com/elastic/apm-server/tests/loader"
+	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
 )
 
@@ -94,7 +96,17 @@ type RequestInfo struct {
 	Path string
 }
 
-func TestProcessRequests(t *testing.T, p processor.Processor, config config.Config, requestInfo []RequestInfo, ignored map[string]string) {
+type TransBatch []model.Transformable
+
+func (t TransBatch) Transform(c config.TransformConfig, tctx *model.TransformContext) []beat.Event {
+	events := make([]beat.Event, len(t))
+	for i, a := range t {
+		events[i] = a.Transform(c, tctx)
+	}
+	return events
+}
+
+func TestProcessRequests(t *testing.T, p processor.Processor, config config.TransformConfig, requestInfo []RequestInfo, ignored map[string]string) {
 	assert := assert.New(t)
 	for _, info := range requestInfo {
 		data, err := loader.LoadData(info.Path)
@@ -106,7 +118,7 @@ func TestProcessRequests(t *testing.T, p processor.Processor, config config.Conf
 		payload, err := p.Decode(data)
 		assert.NoError(err)
 
-		events := payload.Transform(config)
+		events := TransBatch(payload).Transform(config, &model.TransformContext{})
 
 		// extract Fields and write to received.json
 		eventFields := make([]common.MapStr, len(events))

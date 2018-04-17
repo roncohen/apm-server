@@ -18,11 +18,12 @@ import (
 
 	conf "github.com/elastic/apm-server/config"
 	"github.com/elastic/apm-server/decoder"
+	"github.com/elastic/apm-server/model"
 	"github.com/elastic/apm-server/processor"
 	perr "github.com/elastic/apm-server/processor/error"
-	"github.com/elastic/apm-server/processor/healthcheck"
 	"github.com/elastic/apm-server/processor/sourcemap"
 	"github.com/elastic/apm-server/processor/transaction"
+
 	"github.com/elastic/apm-server/utility"
 	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/libbeat/monitoring"
@@ -35,9 +36,12 @@ const (
 	FrontendErrorsURL       = "/v1/client-side/errors"
 	HealthCheckURL          = "/healthcheck"
 	SourcemapsURL           = "/v1/client-side/sourcemaps"
+	StreamBackendURL        = "/v2/intake"
 
 	rateLimitCacheSize       = 1000
 	rateLimitBurstMultiplier = 2
+
+	v2TransformBatchSize = 100
 
 	supportedHeaders = "Content-Type, Content-Encoding, Accept"
 	supportedMethods = "POST, OPTIONS"
@@ -117,13 +121,18 @@ var (
 		}
 	}
 
+	errHeaderMissing = errors.New("header must be first object in stream")
+
 	Routes = map[string]routeMapping{
 		BackendTransactionsURL:  {backendHandler, transaction.NewProcessor},
 		FrontendTransactionsURL: {frontendHandler, transaction.NewProcessor},
-		BackendErrorsURL:        {backendHandler, perr.NewProcessor},
-		FrontendErrorsURL:       {frontendHandler, perr.NewProcessor},
-		HealthCheckURL:          {healthCheckHandler, healthcheck.NewProcessor},
-		SourcemapsURL:           {sourcemapHandler, sourcemap.NewProcessor},
+
+		StreamBackendURL: {streamBackendHandler, nil},
+
+		BackendErrorsURL:  {backendHandler, perr.NewProcessor},
+		FrontendErrorsURL: {frontendHandler, perr.NewProcessor},
+		HealthCheckURL:    {healthCheckHandler, nil},
+		SourcemapsURL:     {sourcemapHandler, sourcemap.NewProcessor},
 	}
 )
 
@@ -166,7 +175,7 @@ func backendHandler(pf ProcessorFactory, beaterConfig *Config, report reporter) 
 	return logHandler(
 		concurrencyLimitHandler(beaterConfig,
 			authHandler(beaterConfig.SecretToken,
-				processRequestHandler(pf, conf.Config{}, report,
+				processRequestHandler(pf, conf.TransformConfig{}, report,
 					decoder.DecodeSystemData(decoder.DecodeLimitJSONData(beaterConfig.MaxUnzippedSize), beaterConfig.AugmentEnabled)))))
 }
 
@@ -175,7 +184,7 @@ func frontendHandler(pf ProcessorFactory, beaterConfig *Config, report reporter)
 	if err != nil {
 		logp.NewLogger("handler").Error(err.Error())
 	}
-	config := conf.Config{
+	config := conf.TransformConfig{
 		SmapMapper:          smapper,
 		LibraryPattern:      regexp.MustCompile(beaterConfig.Frontend.LibraryPattern),
 		ExcludeFromGrouping: regexp.MustCompile(beaterConfig.Frontend.ExcludeFromGrouping),
@@ -189,6 +198,18 @@ func frontendHandler(pf ProcessorFactory, beaterConfig *Config, report reporter)
 							decoder.DecodeUserData(decoder.DecodeLimitJSONData(beaterConfig.MaxUnzippedSize), beaterConfig.AugmentEnabled)))))))
 }
 
+func streamBackendHandler(_ ProcessorFactory, beaterConfig *Config, report reporter) http.Handler {
+
+	requestDecodeer := decoder.DecodeSystemData(
+		decoder.DecoderStreamAdapter(
+			decoder.StreamDecodeLimitJSONData(beaterConfig.MaxUnzippedSize)), beaterConfig.AugmentEnabled)
+
+	return logHandler(
+		concurrencyLimitHandler(beaterConfig,
+			authHandler(beaterConfig.SecretToken,
+				processStreamRequest(v2TransformBatchSize, conf.TransformConfig{}, report, requestDecodeer))))
+}
+
 func sourcemapHandler(pf ProcessorFactory, beaterConfig *Config, report reporter) http.Handler {
 	smapper, err := beaterConfig.Frontend.memoizedSmapMapper()
 	if err != nil {
@@ -197,7 +218,7 @@ func sourcemapHandler(pf ProcessorFactory, beaterConfig *Config, report reporter
 	return logHandler(
 		killSwitchHandler(beaterConfig.Frontend.isEnabled(),
 			authHandler(beaterConfig.SecretToken,
-				processRequestHandler(pf, conf.Config{SmapMapper: smapper}, report, decoder.DecodeSourcemapFormData))))
+				processRequestHandler(pf, conf.TransformConfig{SmapMapper: smapper}, report, decoder.DecodeSourcemapFormData))))
 }
 
 func healthCheckHandler(_ ProcessorFactory, _ *Config, _ reporter) http.Handler {
@@ -346,14 +367,14 @@ func corsHandler(allowedOrigins []string, h http.Handler) http.Handler {
 	})
 }
 
-func processRequestHandler(pf ProcessorFactory, config conf.Config, report reporter, decode decoder.Decoder) http.Handler {
+func processRequestHandler(pf ProcessorFactory, config conf.TransformConfig, report reporter, decode decoder.Decoder) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		res := processRequest(r, pf, config, report, decode)
 		sendStatus(w, r, res)
 	})
 }
 
-func processRequest(r *http.Request, pf ProcessorFactory, config conf.Config, report reporter, decode decoder.Decoder) serverResponse {
+func processRequest(r *http.Request, pf ProcessorFactory, config conf.TransformConfig, report reporter, decode decoder.Decoder) serverResponse {
 	processor := pf()
 
 	if r.Method != "POST" {
@@ -373,12 +394,23 @@ func processRequest(r *http.Request, pf ProcessorFactory, config conf.Config, re
 		return cannotValidateResponse(err)
 	}
 
-	payload, err := processor.Decode(data)
+	transformationContext, err := model.DecodeContext(data, err)
 	if err != nil {
 		return cannotDecodeResponse(err)
 	}
 
-	if err = report(pendingReq{payload: payload, config: config}); err != nil {
+	transformables, err := processor.Decode(data)
+	if err != nil {
+		return http.StatusBadRequest, err
+	}
+
+	req := pendingReq{
+		transformable: transformables,
+		config:        config,
+		context:       transformationContext,
+	}
+
+	if err = report(req); err != nil {
 		if strings.Contains(err.Error(), "publisher is being stopped") {
 			return serverShuttingDownResponse(err)
 		}

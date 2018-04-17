@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/elastic/apm-server/model"
+
 	"github.com/elastic/apm-server/beater"
 	"github.com/elastic/apm-server/config"
 	"github.com/elastic/apm-server/tests/loader"
@@ -51,7 +53,7 @@ func generate() error {
 			return err
 		}
 
-		events := payload.Transform(config.Config{})
+		events := payload.Transform(config.TransformConfig{}, &model.TransformContext{})
 
 		for _, d := range events {
 			n, err := d.GetValue("processor.name")
