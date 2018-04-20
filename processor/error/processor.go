@@ -53,6 +53,5 @@ func (p *processor) Decode(raw map[string]interface{}) (model.TransformableBatch
 		decodingError.Inc()
 		return nil, err
 	}
-	agent.Set(pa.Service.Agent.Name)
 	return pa, nil
 }

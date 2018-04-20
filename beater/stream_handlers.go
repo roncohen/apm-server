@@ -100,6 +100,10 @@ func processStreamRequest(transformBatchSize int, config conf.TransformConfig, r
 		}
 
 		transformContext, err := model.DecodeContext(rawHeader, err)
+		if transformContext.Service != nil {
+			agent.Set(transformContext.Service.Agent.Name)
+		}
+
 		for {
 			batch, err := batchedStreamProcessing(r, decoder, v2TransformBatchSize)
 

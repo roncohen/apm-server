@@ -399,6 +399,10 @@ func processRequest(r *http.Request, pf ProcessorFactory, config conf.TransformC
 		return cannotDecodeResponse(err)
 	}
 
+	if transformationContext.Service != nil {
+		agent.Set(transformContext.Service.Agent.Name)
+	}
+
 	transformables, err := processor.Decode(data)
 	if err != nil {
 		return http.StatusBadRequest, err

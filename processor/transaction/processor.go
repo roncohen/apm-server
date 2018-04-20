@@ -55,10 +55,7 @@ func (p *processor) Decode(raw map[string]interface{}) (model.TransformableBatch
 		return nil, err
 	}
 
-	agent.Set(pa.Service.Agent.Name)
-
 	transformables := []model.Transformable{}
-
 	for _, tx := range txs {
 		transformables = append(transformables, tx)
 		for _, sp := range tx.Spans {
