@@ -62,6 +62,10 @@ type serverResponse struct {
 	counter *monitoring.Int
 }
 
+func (s *serverResponse) IsError() bool {
+	return s.err != nil
+}
+
 var (
 	serverMetrics = monitoring.Default.NewRegistry("apm-server.server", monitoring.PublishExpvar)
 	counter       = func(s string) *monitoring.Int {
@@ -389,29 +393,15 @@ func processRequest(r *http.Request, pf ProcessorFactory, config conf.TransformC
 		return cannotDecodeResponse(err)
 
 	}
-
-	if err = processor.Validate(data); err != nil {
-		return cannotValidateResponse(err)
-	}
-
-	transformationContext, err := model.DecodeContext(data, err)
-	if err != nil {
-		return cannotDecodeResponse(err)
-	}
-
-	if transformationContext.Service != nil {
-		agent.Set(transformContext.Service.Agent.Name)
-	}
-
-	transformables, err := processor.Decode(data)
-	if err != nil {
-		return http.StatusBadRequest, err
+	transformables, tctx, response := ProcessPayload(data, processor)
+	if response.err != nil {
+		return response
 	}
 
 	req := pendingReq{
 		transformable: transformables,
 		config:        config,
-		context:       transformationContext,
+		context:       tctx,
 	}
 
 	if err = report(req); err != nil {
@@ -422,6 +412,24 @@ func processRequest(r *http.Request, pf ProcessorFactory, config conf.TransformC
 	}
 
 	return acceptedResponse
+}
+
+func ProcessPayload(data map[string]interface{}, p processor.Processor) (model.TransformableBatch, *model.TransformContext, serverResponse) {
+	var err error
+	if err = p.Validate(data); err != nil {
+		return nil, nil, cannotValidateResponse(err)
+	}
+
+	transformationContext, err := model.DecodeContext(data, err)
+	if err != nil {
+		return nil, nil, cannotDecodeResponse(err)
+	}
+
+	transformables, err := p.Decode(data)
+	if err != nil {
+		return nil, nil, cannotDecodeResponse(err)
+	}
+	return transformables, transformationContext, okResponse
 }
 
 func sendStatus(w http.ResponseWriter, r *http.Request, res serverResponse) {

@@ -88,27 +88,24 @@ func getFromStream(r *http.Request, decoder decoder.Decoder) (model.Transformabl
 }
 
 func processStreamRequest(transformBatchSize int, config conf.TransformConfig, report reporter, decoder decoder.Decoder) http.Handler {
-	sthandler := func(r *http.Request) (int, error) {
+	sthandler := func(r *http.Request) serverResponse {
 		rawHeader, err := decoder(r)
 		if err != nil {
-			return http.StatusBadRequest, err
+			return serverResponse{err, 400, nil}
 		}
 
 		htype, ok := rawHeader["type"]
 		if !ok || htype != "header" {
-			return http.StatusBadRequest, errHeaderMissing
+			return cannotValidateResponse(errors.New("missing header"))
 		}
 
 		transformContext, err := model.DecodeContext(rawHeader, err)
-		if transformContext.Service != nil {
-			agent.Set(transformContext.Service.Agent.Name)
-		}
 
 		for {
 			batch, err := batchedStreamProcessing(r, decoder, v2TransformBatchSize)
 
 			if err == io.EOF {
-				return http.StatusOK, nil
+				return okResponse
 			}
 
 			report(pendingReq{
@@ -116,12 +113,11 @@ func processStreamRequest(transformBatchSize int, config conf.TransformConfig, r
 			})
 		}
 
-		return http.StatusOK, nil
+		return okResponse
 	}
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
-		code, err := sthandler(r)
-		sendStatus(w, r, code, err)
+		sendStatus(w, r, sthandler(r))
 	}
 
 	return http.HandlerFunc(handler)
