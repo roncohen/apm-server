@@ -2,7 +2,6 @@ package transaction
 
 import (
 	"errors"
-	"log"
 	"time"
 
 	"github.com/elastic/apm-server/config"
@@ -75,9 +74,6 @@ func (s *Span) Transform(config config.TransformConfig, context *m.TransformCont
 	utility.Add(tr, "stacktrace", st)
 
 	spanContext := s.Context
-	if spanContext == nil {
-		log.Println("@@@@@@@@@@ ")
-	}
 	utility.Add(spanContext, "service", context.Service.MinimalTransform())
 
 	return beat.Event{
