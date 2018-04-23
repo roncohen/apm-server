@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"log"
 	"strconv"
 	"time"
 
@@ -128,7 +129,7 @@ func (e *Event) Transform(config config.TransformConfig, context *m.TransformCon
 	if e.Transaction != nil && e.Transaction.Id != "" {
 		tx = common.MapStr{"id": e.Transaction.Id}
 	}
-
+	log.Println("eContext:", e.Context)
 	return beat.Event{
 		Fields: common.MapStr{
 			"processor":   processorEntry,

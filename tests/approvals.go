@@ -12,11 +12,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yudai/gojsondiff"
 
+	"github.com/elastic/apm-server/beater"
 	"github.com/elastic/apm-server/config"
-	"github.com/elastic/apm-server/model"
 	"github.com/elastic/apm-server/processor"
 	"github.com/elastic/apm-server/tests/loader"
-	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
 )
 
@@ -96,15 +95,15 @@ type RequestInfo struct {
 	Path string
 }
 
-type TransBatch []model.Transformable
+// type TransBatch []model.Transformable
 
-func (t TransBatch) Transform(c config.TransformConfig, tctx *model.TransformContext) []beat.Event {
-	events := make([]beat.Event, len(t))
-	for i, a := range t {
-		events[i] = a.Transform(c, tctx)
-	}
-	return events
-}
+// func (t TransBatch) Transform(c config.TransformConfig, tctx *model.TransformContext) []beat.Event {
+// 	events := make([]beat.Event, len(t))
+// 	for i, a := range t {
+// 		events[i] = a.Transform(c, tctx)
+// 	}
+// 	return events
+// }
 
 func TestProcessRequests(t *testing.T, p processor.Processor, config config.TransformConfig, requestInfo []RequestInfo, ignored map[string]string) {
 	assert := assert.New(t)
@@ -112,13 +111,13 @@ func TestProcessRequests(t *testing.T, p processor.Processor, config config.Tran
 		data, err := loader.LoadData(info.Path)
 		assert.Nil(err)
 
-		err = p.Validate(data)
-		assert.NoError(err)
+		transformableBatch, tctx, serverResponse := beater.ProcessPayload(data, p)
 
-		payload, err := p.Decode(data)
-		assert.NoError(err)
+		if serverResponse.IsError() {
+			assert.Fail("Failure processing payload")
+		}
 
-		events := TransBatch(payload).Transform(config, &model.TransformContext{})
+		events := transformableBatch.Transform(config, tctx)
 
 		// extract Fields and write to received.json
 		eventFields := make([]common.MapStr, len(events))

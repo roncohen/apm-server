@@ -2,6 +2,7 @@ package transaction
 
 import (
 	"errors"
+	"log"
 	"time"
 
 	"github.com/elastic/apm-server/config"
@@ -44,6 +45,10 @@ func DecodeSpan(input interface{}, err error) (*Span, error) {
 		TransactionId: decoder.StringPtr(raw, "transaction_id"),
 	}
 
+	if sp.Context == nil {
+		sp.Context = common.MapStr{}
+	}
+
 	if _, ok = raw["timestamp"]; ok {
 		out := decoder.TimeRFC3339WithDefault(raw, "timestamp")
 		sp.Timestamp = out
@@ -70,6 +75,9 @@ func (s *Span) Transform(config config.TransformConfig, context *m.TransformCont
 	utility.Add(tr, "stacktrace", st)
 
 	spanContext := s.Context
+	if spanContext == nil {
+		log.Println("@@@@@@@@@@ ")
+	}
 	utility.Add(spanContext, "service", context.Service.MinimalTransform())
 
 	return beat.Event{

@@ -58,13 +58,6 @@ func (c *TransformContext) TransformInto(m common.MapStr) common.MapStr {
 		}
 	}
 
-	log.Println("context.system: ", c.System)
-	a, _ := c.system.GetValue("hostname")
-	log.Println("context.system.pid: ", a)
-
-	a, _ = m.GetValue("context.system")
-	log.Println("context.system.pid1: ", a)
-
 	utility.Add(m, "service", *c.service)
 	utility.Add(m, "process", *c.process)
 	utility.Add(m, "system", *c.system)
@@ -87,6 +80,7 @@ func DecodeContext(input interface{}, err error) (*TransformContext, error) {
 	tc.Process, err = DecodeProcess(raw["process"], err)
 	tc.Service, err = DecodeService(raw["service"], err)
 	tc.System, err = DecodeSystem(raw["system"], err)
+	tc.User, err = DecodeUser(raw["user"], err)
 
 	return &tc, err
 }
