@@ -61,6 +61,10 @@ func DecodeTransaction(input interface{}, err error) (*Transaction, error) {
 		if span.Timestamp.IsZero() {
 			span.Timestamp = e.Timestamp
 		}
+
+		if span.TransactionId == nil {
+			span.TransactionId = &e.Id
+		}
 		e.Spans[idx] = span
 	}
 	return &e, err
