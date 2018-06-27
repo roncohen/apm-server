@@ -26,8 +26,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/elastic/apm-agent-go"
-	"github.com/elastic/apm-server/config"
-	pr "github.com/elastic/apm-server/processor"
+	"github.com/elastic/apm-server/model"
 	"github.com/elastic/beats/libbeat/beat"
 )
 
@@ -47,9 +46,9 @@ type publisher struct {
 }
 
 type pendingReq struct {
-	payload pr.Payload
-	config  config.Config
-	trace   bool
+	payload          []model.Transformable
+	transformContext *model.TransformContext
+	trace            bool
 }
 
 var (
@@ -144,7 +143,10 @@ func (p *publisher) processPendingReq(req pendingReq) {
 	}
 
 	span := tx.StartSpan("Transform", "Publisher", nil)
-	events := req.payload.Transform(req.config)
+	events := []beat.Event{}
+	for _, transformable := range req.payload {
+		events = append(events, transformable.Events(req.transformContext)...)
+	}
 	span.End()
 
 	span = tx.StartSpan("PublishAll", "Publisher", nil)

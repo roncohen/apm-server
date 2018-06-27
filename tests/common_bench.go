@@ -20,12 +20,14 @@ package tests
 import (
 	"testing"
 
-	"github.com/elastic/apm-server/config"
-	"github.com/elastic/apm-server/processor"
+	"github.com/elastic/apm-server/beater"
+	"github.com/elastic/apm-server/model"
+	"github.com/elastic/apm-server/validation"
+
 	"github.com/elastic/apm-server/tests/loader"
 )
 
-func benchmarkValidate(b *testing.B, p processor.Processor, requestInfo RequestInfo) {
+func benchmarkValidate(b *testing.B, routeModel beater.V1PayloadType, requestInfo RequestInfo) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
@@ -34,13 +36,13 @@ func benchmarkValidate(b *testing.B, p processor.Processor, requestInfo RequestI
 			b.Error(err)
 		}
 		b.StartTimer()
-		if err := p.Validate(data); err != nil {
+		if err := validation.Validate(data, routeModel.Schema); err != nil {
 			b.Error(err)
 		}
 	}
 }
 
-func benchmarkDecode(b *testing.B, p processor.Processor, requestInfo RequestInfo) {
+func benchmarkDecode(b *testing.B, routeModel beater.V1PayloadType, requestInfo RequestInfo) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
@@ -49,13 +51,13 @@ func benchmarkDecode(b *testing.B, p processor.Processor, requestInfo RequestInf
 			b.Error(err)
 		}
 		b.StartTimer()
-		if _, err := p.Decode(data); err != nil {
+		if _, _, err := routeModel.PayloadDecoder(data); err != nil {
 			b.Error(err)
 		}
 	}
 }
 
-func benchmarkTransform(b *testing.B, p processor.Processor, config config.Config, requestInfo RequestInfo) {
+func benchmarkTransform(b *testing.B, routeModel beater.V1PayloadType, tctx *model.TransformContext, requestInfo RequestInfo) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
@@ -63,16 +65,20 @@ func benchmarkTransform(b *testing.B, p processor.Processor, config config.Confi
 		if err != nil {
 			b.Error(err)
 		}
-		if payload, err := p.Decode(data); err != nil {
+		if metadata, transformable, err := routeModel.PayloadDecoder(data); err != nil {
 			b.Error(err)
 		} else {
+			tctx.Metadata = *metadata
+
 			b.StartTimer()
-			payload.Transform(config)
+			for _, entity := range transformable {
+				entity.Events(tctx)
+			}
 		}
 	}
 }
 
-func benchmarkProcessRequest(b *testing.B, p processor.Processor, config config.Config, requestInfo RequestInfo) {
+func benchmarkProcessRequest(b *testing.B, routeModel beater.V1PayloadType, tctx *model.TransformContext, requestInfo RequestInfo) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
@@ -81,30 +87,33 @@ func benchmarkProcessRequest(b *testing.B, p processor.Processor, config config.
 			b.Error(err)
 		}
 		b.StartTimer()
-		if err := p.Validate(data); err != nil {
+		if err := validation.Validate(data, routeModel.Schema); err != nil {
 			b.Error(err)
 		}
-		if payload, err := p.Decode(data); err != nil {
+		if metadata, transformables, err := routeModel.PayloadDecoder(data); err != nil {
 			b.Error(err)
 		} else {
-			payload.Transform(config)
+			tctx.Metadata = *metadata
+			for _, transformable := range transformables {
+				transformable.Events(tctx)
+			}
 		}
 	}
 }
 
-func BenchmarkProcessRequests(b *testing.B, p processor.Processor, config config.Config, requestInfo []RequestInfo) {
+func BenchmarkProcessRequests(b *testing.B, routeModel beater.V1PayloadType, tctx *model.TransformContext, requestInfo []RequestInfo) {
 	for _, info := range requestInfo {
 		validate := func(b *testing.B) {
-			benchmarkValidate(b, p, info)
+			benchmarkValidate(b, routeModel, info)
 		}
 		decode := func(b *testing.B) {
-			benchmarkDecode(b, p, info)
+			benchmarkDecode(b, routeModel, info)
 		}
 		transform := func(b *testing.B) {
-			benchmarkTransform(b, p, config, info)
+			benchmarkTransform(b, routeModel, tctx, info)
 		}
 		processRequest := func(b *testing.B) {
-			benchmarkProcessRequest(b, p, config, info)
+			benchmarkProcessRequest(b, routeModel, tctx, info)
 		}
 		b.Run(info.Name+"Validate", validate)
 		b.Run(info.Name+"Decode", decode)

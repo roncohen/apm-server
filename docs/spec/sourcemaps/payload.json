@@ -22,7 +22,11 @@
             "pattern": "^[a-zA-Z0-9 _-]+$",
             "maxLength": 1024,
             "minLength": 1
+        },
+        "sourcemap": {
+            "type": "string",
+            "minLength": 1
         }
     },
-    "required": ["bundle_filepath", "service_name", "service_version"]
+    "required": ["bundle_filepath", "service_name", "service_version", "sourcemap"]
 }

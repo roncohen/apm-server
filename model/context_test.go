@@ -74,7 +74,8 @@ func TestContext(t *testing.T) {
 	}
 
 	for idx, te := range tests {
-		ctx := NewContext(te.service, te.process, te.system, te.user)
+		tctx := &TransformContext{Metadata: Metadata{Process: te.process, System: te.system, Service: te.service, User: te.user}}
+		ctx := NewContext(tctx)
 		assert.Equal(t, te.context, ctx,
 			fmt.Sprintf("<%v> Expected: %v, Actual: %v", idx, te.context, ctx))
 	}
@@ -117,7 +118,7 @@ func TestContextTransform(t *testing.T) {
 	}
 
 	for idx, te := range tests {
-		out := te.context.Transform(te.m)
+		out := te.context.Merge(te.m)
 		assert.Equal(t, te.out, out,
 			fmt.Sprintf("<%v> Expected: %v, Actual: %v", idx, te.out, out))
 	}

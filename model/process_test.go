@@ -55,9 +55,9 @@ func TestProcessTransform(t *testing.T) {
 			},
 		},
 	}
-
+	tctx := &TransformContext{}
 	for _, test := range tests {
-		output := test.Process.Transform()
+		output := test.Process.Transform(tctx)
 		assert.Equal(t, test.Output, output)
 	}
 }

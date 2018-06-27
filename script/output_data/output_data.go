@@ -25,73 +25,78 @@ import (
 	"path/filepath"
 
 	"github.com/elastic/apm-server/beater"
-	"github.com/elastic/apm-server/config"
+	"github.com/elastic/apm-server/model"
+
+	"github.com/elastic/apm-server/validation"
+
 	"github.com/elastic/apm-server/tests/loader"
 )
 
 func main() {
 
-	err := generate()
+	err := generateV1Payloads()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: %s\n", err)
 		os.Exit(1)
 	}
 }
 
-func generate() error {
+func generateV1Payloads() error {
 	var checked = map[string]struct{}{}
 
-	for path, mapping := range beater.Routes {
+	for path, v1Route := range beater.V1Routes {
 
 		if path == beater.HealthCheckURL {
 			continue
 		}
 
-		p := mapping.ProcessorFactory()
-
-		data, err := loader.LoadData(filepath.Join("..", "testdata", p.Name(), "payload.json"))
+		data, err := loader.LoadData(filepath.Join("..", "testdata", v1Route.Name, "payload.json"))
 		if err != nil {
 			return err
 		}
 
-		err = p.Validate(data)
+		err = validation.Validate(data, v1Route.Schema)
 		if err != nil {
 			return err
 		}
 
-		payload, err := p.Decode(data)
+		metadata, transformables, err := v1Route.PayloadDecoder(data)
 		if err != nil {
 			return err
 		}
 
-		events := payload.Transform(config.Config{})
+		tctx := &model.TransformContext{
+			Metadata: *metadata,
+		}
 
-		for _, d := range events {
-			n, err := d.GetValue("processor.name")
-			if err != nil {
-				return err
-			}
-			event, err := d.GetValue("processor.event")
-			if err != nil {
-				return err
-			}
-
-			key := n.(string) + "-" + event.(string)
-
-			if _, ok := checked[key]; !ok {
-				checked[key] = struct{}{}
-				file := filepath.Join("docs/data/elasticsearch", event.(string)+".json")
-
-				output, err := json.MarshalIndent(d.Fields, "", "    ")
+		for _, tr := range transformables {
+			for _, d := range tr.Events(tctx) {
+				n, err := d.GetValue("processor.name")
 				if err != nil {
 					return err
 				}
-				if len(output) > 0 && output[len(output)-1] != '\n' {
-					output = append(output, '\n')
-				}
-				err = ioutil.WriteFile(file, output, 0644)
+				event, err := d.GetValue("processor.event")
 				if err != nil {
 					return err
+				}
+
+				key := n.(string) + "-" + event.(string)
+
+				if _, ok := checked[key]; !ok {
+					checked[key] = struct{}{}
+					file := filepath.Join("docs/data/elasticsearch", event.(string)+".json")
+
+					output, err := json.MarshalIndent(d.Fields, "", "    ")
+					if err != nil {
+						return err
+					}
+					if len(output) > 0 && output[len(output)-1] != '\n' {
+						output = append(output, '\n')
+					}
+					err = ioutil.WriteFile(file, output, 0644)
+					if err != nil {
+						return err
+					}
 				}
 			}
 		}

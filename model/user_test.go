@@ -58,9 +58,9 @@ func TestUserTransform(t *testing.T) {
 			},
 		},
 	}
-
+	tctx := &TransformContext{}
 	for _, test := range tests {
-		output := test.User.Transform()
+		output := test.User.Transform(tctx)
 		assert.Equal(t, test.Output, output)
 	}
 }

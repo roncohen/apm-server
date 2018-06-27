@@ -24,7 +24,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/elastic/apm-server/config"
 	"github.com/elastic/beats/libbeat/common"
 )
 
@@ -141,8 +140,15 @@ func TestStacktraceTransform(t *testing.T) {
 		},
 	}
 
+	tctx := &TransformContext{
+		Config: TransformConfig{},
+		Metadata: Metadata{
+			Service: &service,
+		},
+	}
+
 	for idx, test := range tests {
-		output := test.Stacktrace.Transform(config.Config{}, service)
+		output := test.Stacktrace.Transform(tctx)
 		assert.Equal(t, test.Output, output, fmt.Sprintf("Failed at idx %v; %s", idx, test.Msg))
 	}
 }
@@ -257,10 +263,17 @@ func TestStacktraceTransformWithSourcemapping(t *testing.T) {
 		},
 	}
 
+	tctx := &TransformContext{
+		Config: TransformConfig{SmapMapper: &FakeMapper{}},
+		Metadata: Metadata{
+			Service: &service,
+		},
+	}
+
 	for idx, test := range tests {
 		// run `Stacktrace.Transform` twice to ensure method is idempotent
-		test.Stacktrace.Transform(config.Config{SmapMapper: &FakeMapper{}}, service)
-		output := test.Stacktrace.Transform(config.Config{SmapMapper: &FakeMapper{}}, service)
+		test.Stacktrace.Transform(tctx)
+		output := test.Stacktrace.Transform(tctx)
 		assert.Equal(t, test.Output, output, fmt.Sprintf("Failed at idx %v; %s", idx, test.Msg))
 	}
 }

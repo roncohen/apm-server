@@ -73,9 +73,9 @@ func TestSystemTransform(t *testing.T) {
 			},
 		},
 	}
-
+	tctx := &TransformContext{}
 	for _, test := range tests {
-		output := test.System.Transform()
+		output := test.System.Transform(tctx)
 		assert.Equal(t, test.Output, output)
 	}
 }

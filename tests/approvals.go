@@ -26,13 +26,16 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/elastic/apm-server/beater"
+	"github.com/elastic/apm-server/model"
+	"github.com/elastic/apm-server/validation"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yudai/gojsondiff"
 
-	"github.com/elastic/apm-server/config"
-	"github.com/elastic/apm-server/processor"
 	"github.com/elastic/apm-server/tests/loader"
+	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
 )
 
@@ -115,18 +118,23 @@ type RequestInfo struct {
 	Path string
 }
 
-func TestProcessRequests(t *testing.T, p processor.Processor, config config.Config, requestInfo []RequestInfo, ignored map[string]string) {
+func TestProcessRequests(t *testing.T, modelRoute beater.V1PayloadType, tctx *model.TransformContext, requestInfo []RequestInfo, ignored map[string]string) {
 	for _, info := range requestInfo {
 		data, err := loader.LoadData(info.Path)
 		require.NoError(t, err)
 
-		err = p.Validate(data)
+		err = validation.Validate(data, modelRoute.Schema)
 		require.NoError(t, err)
 
-		payload, err := p.Decode(data)
+		metadata, transformable, err := modelRoute.PayloadDecoder(data)
 		require.NoError(t, err)
 
-		events := payload.Transform(config)
+		tctx.Metadata = *metadata
+
+		events := []beat.Event{}
+		for _, e := range transformable {
+			events = append(events, e.Events(tctx)...)
+		}
 
 		// extract Fields and write to received.json
 		eventFields := make([]common.MapStr, len(events))

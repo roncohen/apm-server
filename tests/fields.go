@@ -23,10 +23,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elastic/beats/libbeat/beat"
+
+	"github.com/elastic/apm-server/model"
+
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/apm-server/config"
-	pr "github.com/elastic/apm-server/processor"
+	"github.com/elastic/apm-server/beater"
+
 	"github.com/elastic/apm-server/tests/loader"
 	"github.com/elastic/beats/libbeat/common"
 )
@@ -66,26 +70,30 @@ func (ps *ProcessorSetup) PayloadAttrsMatchFields(t *testing.T, payloadAttrsNotI
 	))
 
 	notInFields = Union(disabled, notInFields)
-	events := fetchFields(t, ps.Proc, ps.FullPayloadPath, notInFields)
+	events := fetchFields(t, ps.V1PayloadType, ps.FullPayloadPath, notInFields)
 	missing := Difference(events, all)
 	missing = differenceWithGroup(missing, notInFields)
 	assertEmptySet(t, missing, fmt.Sprintf("Event attributes not documented in fields.yml: %v", missing))
 
 	// check ES fields in event
-	events = fetchFields(t, ps.Proc, ps.FullPayloadPath, fieldsNotInPayload)
+	events = fetchFields(t, ps.V1PayloadType, ps.FullPayloadPath, fieldsNotInPayload)
 	missing = Difference(all, events)
 	missing = differenceWithGroup(missing, fieldsNotInPayload)
 	assertEmptySet(t, missing, fmt.Sprintf("Documented Fields missing in event: %v", missing))
 }
 
-func fetchFields(t *testing.T, p pr.Processor, path string, blacklisted *Set) *Set {
+func fetchFields(t *testing.T, pt beater.V1PayloadType, path string, blacklisted *Set) *Set {
 	data, err := loader.LoadData(path)
 	require.NoError(t, err)
-	err = p.Validate(data)
+	err = pt.Validate(data)
 	require.NoError(t, err)
-	payload, err := p.Decode(data)
+	metadata, transformables, err := pt.PayloadDecoder(data)
 	require.NoError(t, err)
-	events := payload.Transform(config.Config{})
+
+	events := []beat.Event{}
+	for _, tr := range transformables {
+		events = append(events, tr.Events(&model.TransformContext{Metadata: *metadata})...)
+	}
 
 	keys := NewSet()
 	for _, event := range events {

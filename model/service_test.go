@@ -95,9 +95,9 @@ func TestServiceTransform(t *testing.T) {
 			},
 		},
 	}
-
+	tctx := &TransformContext{}
 	for _, test := range tests {
-		output := test.Service.Transform()
+		output := test.Service.Transform(tctx)
 		assert.Equal(t, test.Output, output)
 	}
 }

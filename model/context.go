@@ -29,16 +29,16 @@ type Context struct {
 	user    common.MapStr
 }
 
-func NewContext(service *Service, process *Process, system *System, user *User) *Context {
+func NewContext(tctx *TransformContext) *Context {
 	return &Context{
-		service: service.Transform(),
-		process: process.Transform(),
-		system:  system.Transform(),
-		user:    user.Transform(),
+		service: tctx.Metadata.Service.Transform(tctx),
+		process: tctx.Metadata.Process.Transform(tctx),
+		system:  tctx.Metadata.System.Transform(tctx),
+		user:    tctx.Metadata.User.Transform(tctx),
 	}
 }
 
-func (c *Context) Transform(m common.MapStr) common.MapStr {
+func (c *Context) Merge(m common.MapStr) common.MapStr {
 	if m == nil {
 		m = common.MapStr{}
 	} else {
@@ -53,3 +53,25 @@ func (c *Context) Transform(m common.MapStr) common.MapStr {
 	utility.MergeAdd(m, "user", c.user)
 	return m
 }
+
+// func (c *Context) Transform(tcxt *TransformContext) common.MapStr {
+// 	m := common.MapStr{
+// 		"service": c.service.Transform(tcxt),
+// 		"process: c.process.Transform(tcxt),
+// 		"system":  c.system.Transform(tcxt),
+// 		"user":    c.user.Transform(tcxt),
+// 	}
+
+// 	if m == nil {
+// 		m = common.MapStr{}
+// 	} else {
+// 	for k, v := range m {
+// 		// normalize map entries by calling utility.Add
+// 		utility.Add(m, k, v)
+// 	}
+// utility.Add(m, "service", c.service)
+// utility.Add(m, "process", c.process)
+// utility.Add(m, "system", c.system)
+// utility.MergeAdd(m, "user", c.user)
+// 	return m
+// }

@@ -31,12 +31,17 @@ const basePath = "./docs/spec/"
 
 func main() {
 	schemaPaths := []struct {
-		path, schemaOut string
+		path, schemaOut, varName string
 	}{
-		{"errors/payload.json", "processor/error/generated/schema/payload.go"},
-		{"transactions/payload.json", "processor/transaction/generated/schema/payload.go"},
-		{"metrics/payload.json", "processor/metric/generated/schema/payload.go"},
-		{"sourcemaps/payload.json", "processor/sourcemap/generated/schema/payload.go"},
+		{"errors/payload.json", "model/error/generated/schema/payload.go", "PayloadSchema"},
+		{"transactions/payload.json", "model/transaction/generated/schema/payload.go", "PayloadSchema"},
+		{"metrics/payload.json", "model/metric/generated/schema/payload.go", "PayloadSchema"},
+		{"sourcemaps/payload.json", "model/sourcemap/generated/schema/payload.go", "PayloadSchema"},
+
+		{"errors/error.json", "model/error/generated/schema/error.go", "ModelSchema"},
+		{"transactions/transaction.json", "model/transaction/generated/schema/transaction.go", "ModelSchema"},
+		{"transactions/span.json", "model/span/generated/schema/transaction.go", "ModelSchema"},
+		{"metrics/metric.json", "model/metric/generated/schema/metric.go", "ModelSchema"},
 	}
 	for _, schemaInfo := range schemaPaths {
 		file := filepath.Join(filepath.Dir(basePath), schemaInfo.path)
@@ -50,7 +55,7 @@ func main() {
 			panic(err)
 		}
 
-		goScript := fmt.Sprintf("package schema\n\nconst PayloadSchema = `%s`\n", schema)
+		goScript := fmt.Sprintf("package schema\n\nconst %s = `%s`\n", schemaInfo.varName, schema)
 		err = os.MkdirAll(path.Dir(schemaInfo.schemaOut), os.ModePerm)
 		if err != nil {
 			panic(err)

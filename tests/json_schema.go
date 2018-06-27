@@ -29,13 +29,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/apm-server/processor"
+	"github.com/elastic/apm-server/beater"
 	"github.com/elastic/apm-server/tests/loader"
+	"github.com/elastic/apm-server/validation"
 	"github.com/elastic/beats/libbeat/common"
 )
 
 type ProcessorSetup struct {
-	Proc processor.Processor
+	V1PayloadType beater.V1PayloadType
 	// path to payload that should be a full and valid example
 	FullPayloadPath string
 	// path to ES template definitions
@@ -245,7 +246,7 @@ func (ps *ProcessorSetup) changePayload(
 
 		payload = iterateMap(payload, "", fnKey, keyToChange, val, upsertFn).(obj)
 	}
-	err = ps.Proc.Validate(payload)
+	err = validation.Validate(payload, ps.V1PayloadType.Schema)
 	assert.NoError(t, err)
 
 	// - ensure specified keys being absent
@@ -266,10 +267,10 @@ func (ps *ProcessorSetup) changePayload(
 	}()
 
 	// run actual validation
-	err = ps.Proc.Validate(payload)
+	err = validation.Validate(payload, ps.V1PayloadType.Schema)
 	if shouldValidate, errMsg := validateFn(key); shouldValidate {
 		wantLog = !assert.NoError(t, err, fmt.Sprintf("Expected <%v> for key <%s> to be valid", val, key))
-		_, err = ps.Proc.Decode(payload)
+		_, _, err := ps.V1PayloadType.PayloadDecoder(payload)
 		assert.NoError(t, err)
 	} else {
 		if assert.Error(t, err, fmt.Sprintf(`Expected error for key <%v> with msg "%s", but received no error.`, key, errMsg)) {

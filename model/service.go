@@ -84,7 +84,7 @@ func DecodeService(input interface{}, err error) (*Service, error) {
 	return &service, decoder.Err
 }
 
-func (s *Service) MinimalTransform() common.MapStr {
+func (s *Service) MinimalTransform(tctx *TransformContext) common.MapStr {
 	if s == nil {
 		return nil
 	}
@@ -96,11 +96,11 @@ func (s *Service) MinimalTransform() common.MapStr {
 	return svc
 }
 
-func (s *Service) Transform() common.MapStr {
+func (s *Service) Transform(tctx *TransformContext) common.MapStr {
 	if s == nil {
 		return nil
 	}
-	svc := s.MinimalTransform()
+	svc := s.MinimalTransform(tctx)
 	utility.Add(svc, "version", s.Version)
 	utility.Add(svc, "environment", s.Environment)
 
