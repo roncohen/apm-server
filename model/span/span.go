@@ -54,7 +54,7 @@ type Span struct {
 	Timestamp     time.Time
 }
 
-func DecodeSpan(input interface{}, err error) (*Span, error) {
+func DecodeSpan(input interface{}, err error) (model.Transformable, error) {
 	if input == nil || err != nil {
 		return nil, err
 	}

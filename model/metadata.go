@@ -17,11 +17,23 @@
 
 package model
 
+import (
+	"github.com/elastic/apm-server/model/generated/schema"
+	"github.com/elastic/apm-server/validation"
+	"github.com/santhosh-tekuri/jsonschema"
+)
+
 type Metadata struct {
 	Service *Service
 	Process *Process
 	System  *System
 	User    *User
+}
+
+var cachedModelSchema = validation.CreateSchema(schema.MetadataSchema, "metadata")
+
+func MetadataSchema() *jsonschema.Schema {
+	return cachedModelSchema
 }
 
 func DecodeMetadata(raw map[string]interface{}, err error) (*Metadata, error) {

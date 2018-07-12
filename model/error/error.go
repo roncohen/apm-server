@@ -28,6 +28,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/elastic/apm-server/model"
+
 	"github.com/elastic/beats/libbeat/beat"
 
 	m "github.com/elastic/apm-server/model"
@@ -87,7 +89,7 @@ type Log struct {
 	Stacktrace   m.Stacktrace
 }
 
-func DecodeEvent(input interface{}, err error) (*Event, error) {
+func DecodeEvent(input interface{}, err error) (model.Transformable, error) {
 	if input == nil || err != nil {
 		return nil, err
 	}

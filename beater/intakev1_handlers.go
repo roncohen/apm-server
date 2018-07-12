@@ -40,15 +40,18 @@ type ReqMetadataAugmenter func(config *Config) func(*http.Request) map[string]in
 
 type ConfigurableHandler func(*Config, http.Handler) http.Handler
 
-func (v v1Route) Handler(beaterConfig *Config, report reporter) http.Handler {
-	reqDecoder := v.v1RouteType.reqDecoder(beaterConfig)
+func (v v1Route) handler(beaterConfig *Config, report reporter) func(*http.Request) serverResponse {
+	reqDecoder := v.reqDecoder(
+		beaterConfig,
+		decoder.DecodeLimitJSONData(beaterConfig.MaxUnzippedSize),
+	)
 
 	var transformConfig model.TransformConfig
 	if v.v1RouteType.tranformConfig != nil {
-		transformConfig = *v.v1RouteType.tranformConfig(beaterConfig)
+		transformConfig = v.v1RouteType.tranformConfig(beaterConfig)
 	}
 
-	innerHandler := func(w http.ResponseWriter, r *http.Request) serverResponse {
+	return func(r *http.Request) serverResponse {
 		if r.Method != "POST" {
 			return methodNotAllowedResponse
 		}
@@ -90,19 +93,23 @@ func (v v1Route) Handler(beaterConfig *Config, report reporter) http.Handler {
 
 		return acceptedResponse
 	}
+}
+
+func (v v1Route) Handler(beaterConfig *Config, report reporter) http.Handler {
+	internalHandler := v.handler(beaterConfig, report)
 
 	return v.routeTypeHandler(beaterConfig,
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			sendStatus(w, r, innerHandler(w, r))
+			sendStatus(w, r, internalHandler(r))
 		}))
 }
 
-func sourcemappingConfig(beaterConfig *Config) *model.TransformConfig {
+func sourcemappingConfig(beaterConfig *Config) model.TransformConfig {
 	smapper, err := beaterConfig.Frontend.memoizedSmapMapper()
 	if err != nil {
 		logp.NewLogger("handler").Error(err.Error())
 	}
-	return &model.TransformConfig{
+	return model.TransformConfig{
 		SmapMapper:          smapper,
 		LibraryPattern:      regexp.MustCompile(beaterConfig.Frontend.LibraryPattern),
 		ExcludeFromGrouping: regexp.MustCompile(beaterConfig.Frontend.ExcludeFromGrouping),
@@ -122,13 +129,14 @@ func (v *V1PayloadType) Validate(raw map[string]interface{}) error {
 }
 
 type v1RouteType struct {
+	name             string
 	routeTypeHandler ConfigurableHandler
-	reqDecoder       func(*Config) decoder.ReqDecoder
-	tranformConfig   func(*Config) *model.TransformConfig
+	reqDecoder       func(*Config, decoder.ReqDecoder) decoder.ReqDecoder
+	tranformConfig   func(*Config) model.TransformConfig
 }
 
 var (
-	// Payload handling for a model
+	// V1 style payload handling for a model
 	// Each payload type can be paired with a different route type, see below
 	TransactionV1Route = V1PayloadType{
 		"transaction",
@@ -154,34 +162,38 @@ var (
 		sourcemap.DecodePayload,
 	}
 
-	//
+	// Route types define how to with specifics for a type of route
 	FrontendRouteType = v1RouteType{
+		"FrontendRouteType",
 		frontendHandler,
-		func(beaterConfig *Config) decoder.ReqDecoder {
-			return decoder.DecodeUserData(decoder.DecodeLimitJSONData(beaterConfig.MaxUnzippedSize), beaterConfig.AugmentEnabled)
+		func(beaterConfig *Config, rd decoder.ReqDecoder) decoder.ReqDecoder {
+			return decoder.DecodeUserData(rd, beaterConfig.AugmentEnabled)
 		},
 		sourcemappingConfig,
 	}
 
 	BackendRouteType = v1RouteType{
+		"BackendRouteType",
 		backendHandler,
-		func(beaterConfig *Config) decoder.ReqDecoder {
-			return decoder.DecodeSystemData(decoder.DecodeLimitJSONData(beaterConfig.MaxUnzippedSize), beaterConfig.AugmentEnabled)
+		func(beaterConfig *Config, rd decoder.ReqDecoder) decoder.ReqDecoder {
+			return decoder.DecodeSystemData(rd, beaterConfig.AugmentEnabled)
 		},
 		nil,
 	}
 
 	MetricsRouteType = v1RouteType{
+		"MetricsRouteType",
 		metricsHandler,
-		func(beaterConfig *Config) decoder.ReqDecoder {
-			return decoder.DecodeSystemData(decoder.DecodeLimitJSONData(beaterConfig.MaxUnzippedSize), beaterConfig.AugmentEnabled)
+		func(beaterConfig *Config, rd decoder.ReqDecoder) decoder.ReqDecoder {
+			return decoder.DecodeSystemData(rd, beaterConfig.AugmentEnabled)
 		},
 		nil,
 	}
 
 	SourcemapRouteType = v1RouteType{
+		"SourcemapRouteType",
 		sourcemapUploadHandler,
-		func(*Config) decoder.ReqDecoder { return decoder.DecodeSourcemapFormData },
+		func(*Config, decoder.ReqDecoder) decoder.ReqDecoder { return decoder.DecodeSourcemapFormData },
 		sourcemappingConfig,
 	}
 )

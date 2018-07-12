@@ -39,10 +39,15 @@ var (
 	processorEntry  = common.MapStr{"name": "metric", "event": "metric"}
 )
 
-var loadedSchema = validation.CreateSchema(schema.PayloadSchema, "metric")
+var cachedPayloadSchema = validation.CreateSchema(schema.PayloadSchema, "metric")
+var cachedModelSchema = validation.CreateSchema(schema.ModelSchema, "metric")
 
 func PayloadSchema() *jsonschema.Schema {
-	return loadedSchema
+	return cachedPayloadSchema
+}
+
+func ModelSchema() *jsonschema.Schema {
+	return cachedModelSchema
 }
 
 type sample interface {
@@ -102,40 +107,41 @@ func DecodePayload(raw map[string]interface{}) (*m.Metadata, []m.Transformable, 
 		return nil, nil, err
 	}
 
-	decoder := metricDecoder{&utility.ManualDecoder{}}
+	decoder := utility.ManualDecoder{}
 	metrics := decoder.InterfaceArr(raw, "metrics")
 	if decoder.Err != nil {
 		return nil, nil, decoder.Err
 	}
+
 	mes := make([]m.Transformable, len(metrics))
 	for idx, metricData := range metrics {
-		mes[idx] = decoder.decodeMetric(metricData)
-		if decoder.Err != nil {
+		mes[idx], err = DecodeMetric(metricData, err)
+		if err != nil {
 			return nil, nil, decoder.Err
 		}
 	}
 	return metadata, mes, decoder.Err
 }
 
-func (md *metricDecoder) decodeMetric(input interface{}) *metric {
+func DecodeMetric(input interface{}, err error) (m.Transformable, error) {
 	if input == nil {
-		md.Err = errors.New("no data for metric event")
-		return nil
+		return nil, errors.New("no data for metric event")
 	}
 	raw, ok := input.(map[string]interface{})
 	if !ok {
-		md.Err = errors.New("invalid type for metric event")
-		return nil
+		return nil, errors.New("invalid type for metric event")
 	}
 
+	decoder := metricDecoder{&utility.ManualDecoder{}}
+
 	metric := metric{
-		samples:   md.decodeSamples(raw["samples"]),
-		timestamp: md.TimeRFC3339WithDefault(raw, "timestamp"),
+		samples:   decoder.decodeSamples(raw["samples"]),
+		timestamp: decoder.TimeRFC3339WithDefault(raw, "timestamp"),
 	}
-	if tags := utility.Prune(md.MapStr(raw, "tags")); len(tags) > 0 {
+	if tags := utility.Prune(decoder.MapStr(raw, "tags")); len(tags) > 0 {
 		metric.tags = tags
 	}
-	return &metric
+	return &metric, nil
 }
 
 func (md *metricDecoder) decodeSamples(input interface{}) []sample {
