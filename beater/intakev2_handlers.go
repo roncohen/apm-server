@@ -98,6 +98,7 @@ var Models = []struct {
 	},
 }
 
+// handleRawModel validates and decodes a single json object into its struct form
 func (v v2Route) handleRawModel(rawModel map[string]interface{}) (model.Transformable, serverResponse) {
 	for _, model := range Models {
 		if entry, ok := rawModel[model.key]; ok {
@@ -116,6 +117,8 @@ func (v v2Route) handleRawModel(rawModel map[string]interface{}) (model.Transfor
 	return nil, cannotValidateResponse(errors.New("did not recognize object type"))
 }
 
+// readBatch will read up to `batchSize` objects from the ndjson stream
+// it returns a slice of transformables, a serverResponse and a bool that indicates if we're at EOF.
 func (v v2Route) readBatch(batchSize int, reader *NDJSONStreamReader) ([]model.Transformable, serverResponse, bool) {
 	var err error
 	var rawModel map[string]interface{}
@@ -139,7 +142,8 @@ func (v v2Route) readBatch(batchSize int, reader *NDJSONStreamReader) ([]model.T
 	return transformables, serverResponse{}, err == io.EOF
 }
 
-func (v v2Route) readMetadata(ndjsonReader *NDJSONStreamReader) (*model.Metadata, serverResponse) {
+func (v v2Route) readMetadata(r *http.Request, beaterConfig *Config, ndjsonReader *NDJSONStreamReader) (*model.Metadata, serverResponse) {
+	// first item is the metadata object
 	rawData, err := ndjsonReader.Read()
 	if err != nil {
 		return nil, cannotDecodeResponse(err)
@@ -149,13 +153,21 @@ func (v v2Route) readMetadata(ndjsonReader *NDJSONStreamReader) (*model.Metadata
 	if !ok {
 		return nil, cannotValidateResponse(errors.New("invalid metadata format"))
 	}
-	// v.reqDecoder(config, func(r *http.Request) map[string]interface{} { return rawMetadata })
 
+	// augment the metadata object with information from the request, like user-agent or remote address
+	metadataDecoder := func(*http.Request) (map[string]interface{}, error) { return rawMetadata, nil }
+	rawMetadata, err = v.reqDecoder(beaterConfig, metadataDecoder)(r)
+	if err != nil {
+		return nil, cannotDecodeResponse(err)
+	}
+
+	// validate the metadata object against our jsonschema
 	err = validation.Validate(rawMetadata, model.MetadataSchema())
 	if err != nil {
 		return nil, cannotValidateResponse(err)
 	}
 
+	// create a metadata struct
 	metadata, err := model.DecodeMetadata(rawMetadata, err)
 	if err != nil {
 		return nil, cannotDecodeResponse(err)
@@ -169,7 +181,7 @@ func (v v2Route) handler(r *http.Request, beaterConfig *Config, report reporter)
 		return cannotDecodeResponse(err)
 	}
 
-	metadata, serverResponse := v.readMetadata(ndjsonReader)
+	metadata, serverResponse := v.readMetadata(r, beaterConfig, ndjsonReader)
 	if serverResponse.IsError() {
 		return serverResponse
 	}
@@ -205,9 +217,8 @@ func (v v2Route) handler(r *http.Request, beaterConfig *Config, report reporter)
 }
 
 func (v v2Route) Handler(beaterConfig *Config, report reporter) http.Handler {
-	internalHandler := v.handler
 	return v.routeTypeHandler(beaterConfig, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sendStatus(w, r, internalHandler(r, beaterConfig, report))
+		sendStatus(w, r, v.handler(r, beaterConfig, report))
 	}))
 }
 

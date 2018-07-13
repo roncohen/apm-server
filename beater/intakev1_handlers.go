@@ -161,41 +161,6 @@ var (
 		sourcemap.PayloadSchema(),
 		sourcemap.DecodePayload,
 	}
-
-	// Route types define how to with specifics for a type of route
-	FrontendRouteType = v1RouteType{
-		"FrontendRouteType",
-		frontendHandler,
-		func(beaterConfig *Config, rd decoder.ReqDecoder) decoder.ReqDecoder {
-			return decoder.DecodeUserData(rd, beaterConfig.AugmentEnabled)
-		},
-		sourcemappingConfig,
-	}
-
-	BackendRouteType = v1RouteType{
-		"BackendRouteType",
-		backendHandler,
-		func(beaterConfig *Config, rd decoder.ReqDecoder) decoder.ReqDecoder {
-			return decoder.DecodeSystemData(rd, beaterConfig.AugmentEnabled)
-		},
-		nil,
-	}
-
-	MetricsRouteType = v1RouteType{
-		"MetricsRouteType",
-		metricsHandler,
-		func(beaterConfig *Config, rd decoder.ReqDecoder) decoder.ReqDecoder {
-			return decoder.DecodeSystemData(rd, beaterConfig.AugmentEnabled)
-		},
-		nil,
-	}
-
-	SourcemapRouteType = v1RouteType{
-		"SourcemapRouteType",
-		sourcemapUploadHandler,
-		func(*Config, decoder.ReqDecoder) decoder.ReqDecoder { return decoder.DecodeSourcemapFormData },
-		sourcemappingConfig,
-	}
 )
 
 type v1Route struct {
