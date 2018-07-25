@@ -43,12 +43,12 @@ var (
 	processorEntry  = common.MapStr{"name": processorName, "event": docType}
 
 	Metrics = monitoring.Default.NewRegistry("apm-server.processor.metric", monitoring.PublishExpvar)
+
+	cachedPayloadSchema = validation.CreateSchema(schema.PayloadSchema, processorName)
 )
 
-var cachedSchema = validation.CreateSchema(schema.PayloadSchema, processorName)
-
 func PayloadSchema() *jsonschema.Schema {
-	return cachedSchema
+	return cachedPayloadSchema
 }
 
 func DecodePayload(raw map[string]interface{}) ([]transform.Eventable, error) {

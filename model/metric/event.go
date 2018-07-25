@@ -20,12 +20,21 @@ package metric
 import (
 	"time"
 
+	"github.com/elastic/apm-server/model/metric/generated/schema"
 	"github.com/elastic/apm-server/transform"
 	"github.com/elastic/apm-server/utility"
+	"github.com/elastic/apm-server/validation"
 	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/logp"
+	"github.com/santhosh-tekuri/jsonschema"
 )
+
+var cachedModelSchema = validation.CreateSchema(schema.ModelSchema, processorName)
+
+func ModelSchema() *jsonschema.Schema {
+	return cachedModelSchema
+}
 
 type sample struct {
 	name  string

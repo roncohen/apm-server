@@ -50,10 +50,15 @@ const (
 	errorDocType  = "error"
 )
 
-var cachedSchema = validation.CreateSchema(schema.PayloadSchema, processorName)
+var cachedModelSchema = validation.CreateSchema(schema.ModelSchema, processorName)
+var cachedPayloadSchema = validation.CreateSchema(schema.PayloadSchema, processorName)
 
 func PayloadSchema() *jsonschema.Schema {
-	return cachedSchema
+	return cachedPayloadSchema
+}
+
+func ModelSchema() *jsonschema.Schema {
+	return cachedModelSchema
 }
 
 type Event struct {
