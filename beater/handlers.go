@@ -83,6 +83,10 @@ type serverResponse struct {
 	body    interface{}
 }
 
+func (s *serverResponse) IsError() bool {
+	return s.code >= 400
+}
+
 var (
 	serverMetrics = monitoring.Default.NewRegistry("apm-server.server", monitoring.PublishExpvar)
 	counter       = func(s string) *monitoring.Int {
@@ -190,6 +194,13 @@ func newMuxer(beaterConfig *Config, report reporter) *http.ServeMux {
 
 		mux.Handle(path, mapping.ProcessorHandler(mapping.Processor, beaterConfig, report))
 	}
+
+	intakeV2Route := v2Route{
+		configurableDecoder: func(beaterConfig *Config, internalDecoder decoder.ReqDecoder) decoder.ReqDecoder {
+			return decoder.DecodeSystemData(internalDecoder, beaterConfig.AugmentEnabled)
+		},
+	}
+	mux.Handle("/v2/intake", concurrencyLimitHandler(beaterConfig, intakeV2Route.Handler(beaterConfig, report)))
 
 	mux.Handle(rootURL, rootHandler(beaterConfig.SecretToken))
 	mux.Handle(HealthCheckURL, healthCheckHandler())
@@ -474,7 +485,7 @@ func processRequest(r *http.Request, p processor.Processor, config transform.Con
 		return cannotDecodeResponse(err)
 	}
 
-	tctx := transform.Context{
+	tctx := &transform.Context{
 		Config:   config,
 		Metadata: *metadata,
 	}
