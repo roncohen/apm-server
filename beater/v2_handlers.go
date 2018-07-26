@@ -16,8 +16,8 @@ import (
 	"github.com/santhosh-tekuri/jsonschema"
 
 	"github.com/elastic/apm-server/decoder"
-	"github.com/elastic/apm-server/model"
 	er "github.com/elastic/apm-server/model/error"
+	"github.com/elastic/apm-server/model/metadata"
 	"github.com/elastic/apm-server/model/metric"
 	"github.com/elastic/apm-server/model/span"
 	"github.com/elastic/apm-server/model/transaction"
@@ -25,18 +25,24 @@ import (
 
 type v2Route struct {
 	// v1RouteType
+	reqDecoder          decoder.ReqDecoder
+	configurableDecoder func(*Config, decoder.ReqDecoder) decoder.ReqDecoder
 }
 
 type NDJSONStreamReader struct {
 	stream *bufio.Reader
 }
 
-const batchSize = 20
+const batchSize = 10
 
 func (sr *NDJSONStreamReader) Read() (map[string]interface{}, error) {
 	// ReadBytes can return valid data in `buf` _and_ also an io.EOF
 	buf, readErr := sr.stream.ReadBytes('\n')
 	if readErr != nil && readErr != io.EOF {
+		return nil, readErr
+	}
+
+	if len(buf) == 0 {
 		return nil, readErr
 	}
 
@@ -68,14 +74,14 @@ var Models = []struct {
 	modelDecoder func(interface{}, error) (transform.Eventable, error)
 }{
 	{
-		"transaction",
-		transaction.ModelSchema(),
-		transaction.DecodeEvent,
-	},
-	{
 		"span",
 		span.ModelSchema(),
 		span.DecodeSpan,
+	},
+	{
+		"transaction",
+		transaction.ModelSchema(),
+		transaction.DecodeEvent,
 	},
 	{
 		"metric",
@@ -85,7 +91,7 @@ var Models = []struct {
 	{
 		"error",
 		er.ModelSchema(),
-		er.DecodeMetric,
+		er.DecodeEvent,
 	},
 }
 
@@ -133,7 +139,7 @@ func (v v2Route) readBatch(batchSize int, reader *NDJSONStreamReader) ([]transfo
 	return eventables, serverResponse{}, err == io.EOF
 }
 
-func (v v2Route) readMetadata(r *http.Request, beaterConfig *Config, ndjsonReader *NDJSONStreamReader) (*model.Metadata, serverResponse) {
+func (v v2Route) readMetadata(r *http.Request, beaterConfig *Config, ndjsonReader *NDJSONStreamReader) (*metadata.Metadata, serverResponse) {
 	// first item is the metadata object
 	rawData, err := ndjsonReader.Read()
 	if err != nil {
@@ -147,19 +153,19 @@ func (v v2Route) readMetadata(r *http.Request, beaterConfig *Config, ndjsonReade
 
 	// augment the metadata object with information from the request, like user-agent or remote address
 	metadataDecoder := func(*http.Request) (map[string]interface{}, error) { return rawMetadata, nil }
-	rawMetadata, err = v.reqDecoder(beaterConfig, metadataDecoder)(r)
+	rawMetadata, err = v.configurableDecoder(beaterConfig, metadataDecoder)(r)
 	if err != nil {
 		return nil, cannotDecodeResponse(err)
 	}
 
 	// validate the metadata object against our jsonschema
-	err = validation.Validate(rawMetadata, model.MetadataSchema())
+	err = validation.Validate(rawMetadata, metadata.ModelSchema())
 	if err != nil {
 		return nil, cannotValidateResponse(err)
 	}
 
 	// create a metadata struct
-	metadata, err := model.DecodeMetadata(rawMetadata, err)
+	metadata, err := metadata.DecodeMetadata(rawMetadata)
 	if err != nil {
 		return nil, cannotDecodeResponse(err)
 	}
@@ -177,13 +183,13 @@ func (v v2Route) handler(r *http.Request, beaterConfig *Config, report reporter)
 		return serverResponse
 	}
 
-	var tcfg model.TransformConfig
-	if v.tranformConfig != nil {
-		tcfg = v.tranformConfig(beaterConfig)
-	}
+	// var tcfg model.TransformConfig
+	// if v.tranformConfig != nil {
+	// 	tcfg = v.tranformConfig(beaterConfig)
+	// }
 
-	tctx := &model.TransformContext{
-		Config:   tcfg,
+	tctx := &transform.Context{
+		Config:   transform.Config{},
 		Metadata: *metadata,
 	}
 
@@ -191,8 +197,8 @@ func (v v2Route) handler(r *http.Request, beaterConfig *Config, report reporter)
 		eventables, serverResponse, eof := v.readBatch(batchSize, ndjsonReader)
 		if eventables != nil {
 			report(r.Context(), pendingReq{
-				payload:          eventables,
-				transformContext: tctx,
+				eventables: eventables,
+				tcontext:   tctx,
 			})
 		}
 
@@ -208,12 +214,13 @@ func (v v2Route) handler(r *http.Request, beaterConfig *Config, report reporter)
 }
 
 func (v v2Route) Handler(beaterConfig *Config, report reporter) http.Handler {
-	return v.routeTypeHandler(beaterConfig, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sendStatus(w, r, v.handler(r, beaterConfig, report))
-	}))
+	})
 }
 
-var V2Routes = map[string]v2Route{
-	V2BackendURL:  v2Route{BackendRouteType},
-	V2FrontendURL: v2Route{FrontendRouteType},
-}
+// var V2Routes = map[string]v2Route{
+// 	V2BackendURL:
+// 	},
+// 	// V2FrontendURL: v2Route{FrontendRouteType},
+// }

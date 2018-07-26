@@ -38,7 +38,7 @@ func main() {
 		{"metrics/payload.json", "model/metric/generated/schema/payload.go", "PayloadSchema"},
 		{"sourcemaps/payload.json", "model/sourcemap/generated/schema/payload.go", "PayloadSchema"},
 
-		{"metadata.json", "model/generated/schema/metadata.go", "ModelSchema"},
+		{"metadata.json", "model/metadata/generated/schema/metadata.go", "ModelSchema"},
 		{"errors/error.json", "model/error/generated/schema/error.go", "ModelSchema"},
 		{"transactions/transaction.json", "model/transaction/generated/schema/transaction.go", "ModelSchema"},
 		{"transactions/span.json", "model/span/generated/schema/transaction.go", "ModelSchema"},

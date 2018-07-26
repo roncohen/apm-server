@@ -47,7 +47,7 @@ type publisher struct {
 
 type pendingReq struct {
 	eventables []transform.Eventable
-	tcontext   transform.Context
+	tcontext   *transform.Context
 	trace      bool
 }
 
@@ -145,7 +145,7 @@ func (p *publisher) processPendingReq(req pendingReq) {
 	var events []beat.Event
 	span := tx.StartSpan("Transform", "Publisher", nil)
 	for _, eventable := range req.eventables {
-		events = append(events, eventable.Events(&req.tcontext)...)
+		events = append(events, eventable.Events(req.tcontext)...)
 	}
 
 	span.End()

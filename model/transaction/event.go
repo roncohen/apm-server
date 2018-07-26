@@ -76,7 +76,7 @@ type Dropped struct {
 	Total *int
 }
 
-func DecodeEvent(input interface{}, err error) (*Event, error) {
+func DecodeEvent(input interface{}, err error) (transform.Eventable, error) {
 	if input == nil || err != nil {
 		return nil, err
 	}
@@ -98,12 +98,12 @@ func DecodeEvent(input interface{}, err error) (*Event, error) {
 		SpanCount: SpanCount{Dropped: Dropped{Total: decoder.IntPtr(raw, "total", "span_count", "dropped")}},
 	}
 	err = decoder.Err
-	var sp *span.Span
+	var decodedSpan transform.Eventable
 	spans := decoder.InterfaceArr(raw, "spans")
 	e.Spans = make([]*span.Span, len(spans))
 	for idx, rawSpan := range spans {
-		sp, err = span.DecodeSpan(rawSpan, err)
-		e.Spans[idx] = sp
+		decodedSpan, err = span.DecodeSpan(rawSpan, err)
+		e.Spans[idx] = decodedSpan.(*span.Span)
 	}
 	return &e, err
 }

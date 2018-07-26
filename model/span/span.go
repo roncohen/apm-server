@@ -65,7 +65,7 @@ type Span struct {
 	TransactionId string
 }
 
-func DecodeSpan(input interface{}, err error) (*Span, error) {
+func DecodeSpan(input interface{}, err error) (transform.Eventable, error) {
 	if input == nil || err != nil {
 		return nil, err
 	}

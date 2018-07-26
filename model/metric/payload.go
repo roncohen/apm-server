@@ -61,25 +61,30 @@ func DecodePayload(raw map[string]interface{}) ([]transform.Eventable, error) {
 	if decoder.Err != nil {
 		return nil, decoder.Err
 	}
+	var err error
 	metrics := make([]transform.Eventable, len(metricsIntfArr))
 	for idx, metricData := range metricsIntfArr {
-		metrics[idx] = decoder.decodeMetric(metricData)
-		if decoder.Err != nil {
-			return nil, decoder.Err
+		metrics[idx], err = DecodeMetric(metricData, err)
+		if err != nil {
+			return nil, err
 		}
 	}
-	return metrics, decoder.Err
+	return metrics, err
 }
 
-func (md *metricDecoder) decodeMetric(input interface{}) *metric {
+func DecodeMetric(input interface{}, err error) (transform.Eventable, error) {
+	if input == nil || err != nil {
+		return nil, err
+	}
+	md := metricDecoder{&utility.ManualDecoder{}}
 	if input == nil {
 		md.Err = errors.New("no data for metric event")
-		return nil
+		return nil, md.Err
 	}
 	raw, ok := input.(map[string]interface{})
 	if !ok {
 		md.Err = errors.New("invalid type for metric event")
-		return nil
+		return nil, md.Err
 	}
 
 	metric := metric{
@@ -89,7 +94,7 @@ func (md *metricDecoder) decodeMetric(input interface{}) *metric {
 	if tags := utility.Prune(md.MapStr(raw, "tags")); len(tags) > 0 {
 		metric.tags = tags
 	}
-	return &metric
+	return &metric, nil
 }
 
 func (md *metricDecoder) decodeSamples(input interface{}) []*sample {

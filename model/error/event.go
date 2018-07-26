@@ -96,7 +96,7 @@ type Log struct {
 	Stacktrace   m.Stacktrace
 }
 
-func DecodeEvent(input interface{}, err error) (*Event, error) {
+func DecodeEvent(input interface{}, err error) (transform.Eventable, error) {
 	if input == nil || err != nil {
 		return nil, err
 	}
