@@ -196,10 +196,16 @@ func (v v2Route) handler(r *http.Request, beaterConfig *Config, report reporter)
 	for {
 		eventables, serverResponse, eof := v.readBatch(batchSize, ndjsonReader)
 		if eventables != nil {
-			report(r.Context(), pendingReq{
+			err := report(r.Context(), pendingReq{
 				eventables: eventables,
 				tcontext:   tctx,
 			})
+			if err != nil {
+				if strings.Contains(err.Error(), "publisher is being stopped") {
+					return serverShuttingDownResponse(err)
+				}
+				return fullQueueResponse(err)
+			}
 		}
 
 		if serverResponse.IsError() {
@@ -214,9 +220,10 @@ func (v v2Route) handler(r *http.Request, beaterConfig *Config, report reporter)
 }
 
 func (v v2Route) Handler(beaterConfig *Config, report reporter) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sendStatus(w, r, v.handler(r, beaterConfig, report))
-	})
+	return concurrencyLimitHandler(beaterConfig,
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			sendStatus(w, r, v.handler(r, beaterConfig, report))
+		}))
 }
 
 // var V2Routes = map[string]v2Route{
