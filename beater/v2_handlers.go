@@ -170,7 +170,7 @@ func (v v2Route) readMetadata(r *http.Request, beaterConfig *Config, ndjsonReade
 	return metadata, serverResponse{}
 }
 
-func (v v2Route) handler(r *http.Request, beaterConfig *Config, report reporter) serverResponse {
+func (v v2Route) handleRequest(r *http.Request, beaterConfig *Config, report reporter) serverResponse {
 	ndjsonReader, err := StreamDecodeLimitJSONData(r, beaterConfig.MaxUnzippedSize)
 	if err != nil {
 		return cannotDecodeResponse(err)
@@ -219,7 +219,7 @@ func (v v2Route) handler(r *http.Request, beaterConfig *Config, report reporter)
 
 func (v v2Route) Handler(beaterConfig *Config, report reporter) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sendStatus(w, r, v.handler(r, beaterConfig, report))
+		sendStatus(w, r, v.handleRequest(r, beaterConfig, report))
 	})
 }
 
