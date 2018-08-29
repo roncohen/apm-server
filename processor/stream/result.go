@@ -67,7 +67,6 @@ var errorTypesDecreasingHTTPStatus = func() []StreamErrorType {
 type Result struct {
 	Accepted int `json:"accepted"`
 	Invalid  int `json:"invalid"`
-	Dropped  int `json:"dropped"`
 
 	Errors map[StreamErrorType]errorDetails `json:"errors"`
 }

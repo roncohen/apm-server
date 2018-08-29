@@ -1,6 +1,5 @@
 {
     "accepted": 0,
-    "dropped": 0,
     "errors": {
         "ERR_QUEUE_FULL": {
             "count": 23,

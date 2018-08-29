@@ -65,7 +65,6 @@ func (v *v2Handler) sendResponse(logger *logp.Logger, w http.ResponseWriter, sr 
 // then returns an error response
 func (v *v2Handler) handleInvalidHeaders(w http.ResponseWriter, r *http.Request) {
 	sr := stream.Result{
-		Dropped:  -1,
 		Accepted: -1,
 		Invalid:  1,
 	}
