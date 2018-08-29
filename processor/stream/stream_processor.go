@@ -203,8 +203,7 @@ func (s *StreamProcessor) HandleStream(ctx context.Context, meta map[string]inte
 
 				if err == publish.ErrFull {
 					res.Add(QueueFullErr, len(transformables))
-					res.Dropped += len(transformables)
-					continue
+					return res
 				}
 
 				res.AddWithMessage(ServerError, len(transformables), err.Error())
