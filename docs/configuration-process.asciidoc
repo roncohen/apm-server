@@ -29,20 +29,26 @@ Defaults to 'localhost:8200'.
 [[max_unzipped_size]]
 [float]
 ==== `max_unzipped_size`
-Maximum permitted size of an unzipped request accepted by the server to be processed (in Bytes).
-Defaults to 31457280 Bytes (30 MB).
+Maximum permitted size of an unzipped request accepted by the server to be processed (in bytes).
+Defaults to 31457280 bytes (30 MB).
 
 [[max_header_size]]
 [float]
 ==== `max_header_size`
-Maximum permitted size of a request's header accepted by the server to be processed (in Bytes).
-Defaults to 1048576 Bytes (1 MB).
+Maximum permitted size of a request's header accepted by the server to be processed (in bytes).
+Defaults to 1048576 bytes (1 MB).
 
 [[max_request_queue_time]]
 [float]
 ==== `max_request_queue_time`
 Maximum duration a request will be queued before being read.
 Defaults to 2 seconds.
+
+[[max_event_size]]
+[float]
+==== `max_event_size`
+Maximum size of a single event in bytes.
+Defaults to 307200 bytes (200 KB).
 
 [[read_timeout]]
 [float]

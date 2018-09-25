@@ -5,6 +5,7 @@ This section describes common problems you might encounter with APM Server.
 
 * <<no-data-indexed>>
 * <<bad-request>>
+* <<too-large>>
 * <<unauthorized>>
 * <<forbidden>>
 * <<request-too-large>>
@@ -48,6 +49,14 @@ the {apm-agents-ref}/index.html[agent documentation] for details on what is auto
 
 The most likely cause for this is that you are using non compatible versions of agent and APM Server.
 For instance, APM Server 6.2.0 changed the Intake API spec and requires a minimum version of each agent.
+
+
+[[too-large]]
+[float]
+=== HTTP 400: Event too large
+
+This happens when a single event exceeds the limit set in APM Server.
+The limit can be increased by increasing the configuration setting `apm-server.max_event_size`.
 
 [[unauthorized]]
 [float]
